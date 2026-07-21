@@ -69,7 +69,7 @@ def test_text_one_missing_required():
     assert errors == {('field-en',): ['Missing value'], ('field',): []}
     assert data == {
         ('__extras',): {'field-fr': 'bonjour'},
-        ('field',): missing,
+        ('field',): None,
     }
 
 def test_text_one_missing_not_required():
@@ -116,6 +116,7 @@ def test_text_all_missing():
     assert data == {('field',): None}
 
     # accept JSON-encoded {} input
+    data = {('field',): '{}'}
     txt(('field',), data, errors, {})
     assert errors == {('field',): []}
     assert data == {('field',): None}

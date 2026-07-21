@@ -89,10 +89,12 @@ def fluent_text(field, schema):
 
         prefix = key[-1] + '-'
         extras = data.get(key[:-1] + ('__extras',), {})
+        return_json_string = False
         # 1 or 2. dict or JSON encoded string
         # only if no separate field values present
         if value is not missing and not any(n.startswith(prefix) for n in extras):
             if isinstance(value, six.string_types):
+                return_json_string = True
                 try:
                     value = json.loads(value)
                 except ValueError:
@@ -138,7 +140,12 @@ def fluent_text(field, schema):
                 data[key] = json.dumps(value, ensure_ascii=False)
                 return
 
-            data[key] = json.dumps(value, ensure_ascii=False) if value else None
+            if value and return_json_string:
+                value = json.dumps(value, ensure_ascii=False)
+            elif not value:
+                value = None
+
+            data[key] = value
             return
 
         # 3. separate fields
@@ -300,7 +307,7 @@ def fluent_tags(field, schema):
                 data[key] = json.dumps(value)
                 return
 
-            data[key] = json.dumps(value) if value else None
+            data[key] = value if value else None
             return
 
         # 2. separate fields
