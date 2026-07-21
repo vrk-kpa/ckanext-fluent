@@ -138,7 +138,7 @@ def fluent_text(field, schema):
                 data[key] = json.dumps(value, ensure_ascii=False)
                 return
 
-            data[key] = None
+            data[key] = json.dumps(value, ensure_ascii=False) if value else None
             return
 
         # 3. separate fields
@@ -300,7 +300,7 @@ def fluent_tags(field, schema):
                 data[key] = json.dumps(value)
                 return
 
-            data[key] = None
+            data[key] = json.dumps(value) if value else None
             return
 
         # 2. separate fields

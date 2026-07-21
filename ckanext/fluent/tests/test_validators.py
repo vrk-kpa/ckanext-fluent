@@ -113,18 +113,18 @@ def test_text_all_missing():
 
     txt(('field',), data, errors, {})
     assert errors == {('field',): []}
-    assert data == {('field',): '{}'}
+    assert data == {('field',): None}
 
     # accept JSON-encoded {} input
     txt(('field',), data, errors, {})
     assert errors == {('field',): []}
-    assert data == {('field',): '{}'}
+    assert data == {('field',): None}
 
     # actual {} input too
     data = {('field',): {}}
     txt(('field',), data, errors, {})
     assert errors == {('field',): []}
-    assert data == {('field',): '{}'}
+    assert data == {('field',): None}
 
 def test_core_translated_output():
     fcto = fluent_core_translated_output(
