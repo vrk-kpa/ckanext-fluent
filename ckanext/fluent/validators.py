@@ -89,10 +89,12 @@ def fluent_text(field, schema):
 
         prefix = key[-1] + '-'
         extras = data.get(key[:-1] + ('__extras',), {})
+        return_json_string = False
         # 1 or 2. dict or JSON encoded string
         # only if no separate field values present
         if value is not missing and not any(n.startswith(prefix) for n in extras):
             if isinstance(value, six.string_types):
+                return_json_string = True
                 try:
                     value = json.loads(value)
                 except ValueError:
@@ -133,8 +135,17 @@ def fluent_text(field, schema):
                         continue
                     errors[key].append(_('Required language "%s" missing') % lang)
 
-            if not errors[key]:
+            # if not errors and value is not empty dict ({})
+            if not errors[key] and value:
                 data[key] = json.dumps(value, ensure_ascii=False)
+                return
+
+            if value and return_json_string:
+                value = json.dumps(value, ensure_ascii=False)
+            elif not value:
+                value = None
+
+            data[key] = value
             return
 
         # 3. separate fields
@@ -161,7 +172,9 @@ def fluent_text(field, schema):
                 errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
                 output = None
 
-        if output is None:
+        # if output is empty dict ({}) or None
+        if not output:
+            data[key] = None
             return
 
         for lang in output:
@@ -289,8 +302,12 @@ def fluent_tags(field, schema):
                         continue
                     errors[key].append(_('Required language "%s" missing') % lang)
 
-            if not errors[key]:
+            # if not errors and value is not empty dict ({})
+            if not errors[key] and value:
                 data[key] = json.dumps(value)
+                return
+
+            data[key] = value if value else None
             return
 
         # 2. separate fields
@@ -337,7 +354,9 @@ def fluent_tags(field, schema):
                 errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
                 output = None
 
-        if output is None:
+        # if output is empty dict ({}) or None
+        if not output:
+            data[key] = None
             return
 
         for lang in output:
