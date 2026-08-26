@@ -2,8 +2,7 @@ import json
 import re
 import six
 
-from ckan.plugins.toolkit import missing, get_validator, Invalid
-from ckantoolkit import config, _
+from ckan.plugins.toolkit import missing, get_validator, Invalid, config, _
 
 from ckanext.fluent.helpers import (
     fluent_form_languages, fluent_alternate_languages)
@@ -81,10 +80,22 @@ def fluent_text(field, schema):
         if errors[key]:
             return
 
+        enforce_required = True
+        if not schema.get('draft_fields_required', True):
+            state = data.get(('state',), missing)
+            if state is missing or state.startswith('draft'):
+                enforce_required = False
+
         value = data[key]
+
+        prefix = key[-1] + '-'
+        extras = data.get(key[:-1] + ('__extras',), {})
+        return_json_string = False
         # 1 or 2. dict or JSON encoded string
-        if value is not missing:
+        # only if no separate field values present
+        if value is not missing and not any(n.startswith(prefix) for n in extras):
             if isinstance(value, six.string_types):
+                return_json_string = True
                 try:
                     value = json.loads(value)
                 except ValueError:
@@ -118,20 +129,28 @@ def fluent_text(field, schema):
                         errors[key]. append(_('invalid encoding for "%s" value')
                                             % lang)
 
-            for lang in required_langs:
-                if value.get(lang) or any(
-                        value.get(l) for l in alternate_langs.get(lang, [])):
-                    continue
-                errors[key].append(_('Required language "%s" missing') % lang)
+            if enforce_required:
+                for lang in required_langs:
+                    if value.get(lang) or any(
+                            value.get(l) for l in alternate_langs.get(lang, [])):
+                        continue
+                    errors[key].append(_('Required language "%s" missing') % lang)
 
-            if not errors[key]:
-                data[key] = json.dumps(value)
+            # if not errors and value is not empty dict ({})
+            if not errors[key] and value:
+                data[key] = json.dumps(value, ensure_ascii=False)
+                return
+
+            if value and return_json_string:
+                value = json.dumps(value, ensure_ascii=False)
+            elif not value:
+                value = None
+
+            data[key] = value
             return
 
         # 3. separate fields
         output = {}
-        prefix = key[-1] + '-'
-        extras = data.get(key[:-1] + ('__extras',), {})
 
         for name, text in extras.items():
             if not name.startswith(prefix):
@@ -146,19 +165,22 @@ def fluent_text(field, schema):
             if output is not None:
                 output[lang] = text
 
-        for lang in required_langs:
-            if extras.get(prefix + lang) or any(
-                    extras.get(prefix + l) for l in alternate_langs.get(lang, [])):
-                continue
-            errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
-            output = None
+        if enforce_required:
+            for lang in required_langs:
+                if extras.get(prefix + lang) or any(
+                        extras.get(prefix + l) for l in alternate_langs.get(lang, [])):
+                    continue
+                errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
+                output = None
 
-        if output is None:
+        # if output is empty dict ({}) or None
+        if not output:
+            data[key] = None
             return
 
         for lang in output:
             del extras[prefix + lang]
-        data[key] = json.dumps(output)
+        data[key] = json.dumps(output, ensure_ascii=False)
 
     return validator
 
@@ -215,9 +237,18 @@ def fluent_tags(field, schema):
         if errors[key]:
             return
 
+        enforce_required = True
+        if not schema.get('draft_fields_required', True):
+            state = data.get(('state',), missing)
+            if state is missing or state.startswith('draft'):
+                enforce_required = False
+
         value = data[key]
+        prefix = key[-1] + '-'
+        extras = data.get(key[:-1] + ('__extras',), {})
         # 1. dict of lists of tag strings
-        if value is not missing:
+        # only if no separate field values present
+        if value is not missing and not any(n.startswith(prefix) for n in extras):
             if not isinstance(value, dict):
                 errors[key].append(_('expecting JSON object'))
                 return
@@ -265,20 +296,23 @@ def fluent_tags(field, schema):
                     errors[key].extend(errs)
                 value[lang] = tags
 
-            for lang in required_langs:
-                if value.get(lang) or any(
-                        value.get(l) for l in alternate_langs.get(lang, [])):
-                    continue
-                errors[key].append(_('Required language "%s" missing') % lang)
+            if enforce_required:
+                for lang in required_langs:
+                    if value.get(lang) or any(
+                            value.get(l) for l in alternate_langs.get(lang, [])):
+                        continue
+                    errors[key].append(_('Required language "%s" missing') % lang)
 
-            if not errors[key]:
+            # if not errors and value is not empty dict ({})
+            if not errors[key] and value:
                 data[key] = json.dumps(value)
+                return
+
+            data[key] = value if value else None
             return
 
         # 2. separate fields
         output = {}
-        prefix = key[-1] + '-'
-        extras = data.get(key[:-1] + ('__extras',), {})
 
         for name, text in extras.items():
             if not name.startswith(prefix):
@@ -313,14 +347,17 @@ def fluent_tags(field, schema):
                 if errs:
                     errors[key[:-1] + (name,)] = errs
 
-        for lang in required_langs:
-            if extras.get(prefix + lang) or any(
-                    extras.get(prefix + l) for l in alternate_langs.get(lang, [])):
-                continue
-            errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
-            output = None
+        if enforce_required:
+            for lang in required_langs:
+                if extras.get(prefix + lang) or any(
+                        extras.get(prefix + l) for l in alternate_langs.get(lang, [])):
+                    continue
+                errors[key[:-1] + (key[-1] + '-' + lang,)] = [_('Missing value')]
+                output = None
 
-        if output is None:
+        # if output is empty dict ({}) or None
+        if not output:
+            data[key] = None
             return
 
         for lang in output:
